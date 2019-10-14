@@ -9,8 +9,10 @@ ADMRUN=list(range(1,21))
 SAMPLEINFO="workfiles/sampleinfo"
 SAMPLENAME="workfiles/samplename"
 NAME=config["name"]
-with open("workfiles/scaffolds_to_use.txt",'r')as f:
-    scaffold_file_md5=hashlib.md5(f.readline().encode('utf8')).hexdigest()
+scaffolds_to_use=config['scaffolds']
+scaffold_file_md5=hashlib.md5(scaffolds_to_use.encode('utf8')).hexdigest()
+# with open("workfiles/scaffolds_to_use.txt",'r')as f:
+#     scaffold_file_md5=hashlib.md5(f.readline().encode('utf8')).hexdigest()
 # validate(config, "config.schema.json")
 rule all:
     input:
@@ -36,12 +38,19 @@ rule all:
 rule subsetgenome:
     input:
         ref=REF,
-        scaffolds="workfiles/scaffolds_to_use.txt",
-
+        # scaffolds=scaffolds_to_use,
+    params:
+        scaffolds=scaffolds_to_use
     output:
         fa="genome/subsetted/"+scaffold_file_md5+".fa",
     shell:
-        r"samtools faidx {input.ref} `sed 's/,/ /g' {input.scaffolds}` -o {output.fa}"
+        r"""
+        if [ {params.scaffolds}==all ]; then
+            cp {input.ref} {output.fa}
+        else
+            samtools faidx {input.ref} `sed 's/,/ /g' {params.scaffolds}` -o {output.fa}
+        fi
+        """
 
 rule bwa:
     input:
@@ -138,12 +147,19 @@ rule filtering:
 rule subsetvcfs:
     input:
         origvcfs="vcf/Tiger_SNP_6th_N32_final.vcf.gz"
+    params:
+        scaffolds=rules.subsetgenome.params.scaffolds
     output:
         subsettedvcf="vcf/subsetted/"+scaffold_file_md5+".vcf.gz",
         index="vcf/subsetted/"+scaffold_file_md5+".vcf.gz.tbi"
     shell:
-        r"""bcftools view {input.origvcfs} -r `cat {rules.subsetgenome.input.scaffolds} |\
-        sed 's/ /,/g'` -Oz -o {output.subsettedvcf}
+        r"""
+        if [ {params.scaffolds}==all ]; then
+            cp {input.origvcfs} {output.subsettedvcf}
+        else
+            bcftools view {input.origvcfs} -r `echo {params.scaffolds} |\
+            sed 's/ /,/g'` -Oz -o {output.subsettedvcf}
+        fi
         tabix -p vcf {output.subsettedvcf}
         """
 
