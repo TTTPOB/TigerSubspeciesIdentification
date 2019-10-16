@@ -51,12 +51,21 @@ rule subsetgenome:
             samtools faidx {input.ref} `sed 's/,/ /g' {params.scaffolds}` -o {output.fa}
         fi
         """
-
+rule bwaindex:
+    input:
+        ref=rules.subsetgenome.output.fa
+    output:
+        idx="genome/subsetted"+scaffold_file_md5+".fa.bwt"
+    shell:
+        r"""
+        bwa index {input.ref}
+        """
 rule bwa:
     input:
         ref=rules.subsetgenome.output.fa,
         fq1="workfiles/fastq/{name}_L001_R1_001.fastq.gz",
         fq2="workfiles/fastq/{name}_L001_R2_001.fastq.gz",
+        idx=rules.bwaindex.output.idx
     output:
         bwa="workfiles/bwa/{name}.bam"
     params:
@@ -64,7 +73,6 @@ rule bwa:
     threads: THR
     shell:
         r"""
-        bwa index {input.ref}
         bwa mem -t{threads} -M -R {params.rg} {input.ref} {input.fq1} {input.fq2}|samtools view -bh -f3 -F3852 -t{threads} > {output.bwa}
         """ 
 rule sortandmarkdup:

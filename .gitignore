@@ -1,0 +1,6 @@
+workfiles
+genome
+vcf
+.vscode
+.snakemake
+.archive*
