@@ -4,3 +4,5 @@ vcf
 .vscode
 .snakemake
 .archive*
+voucherbwa/fastq
+voucherbwa/bam

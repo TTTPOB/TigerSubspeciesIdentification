@@ -1,0 +1,11 @@
+{
+    "reference": "../genome/P_tigris.scaffold.fa",
+    "samplecode": [
+        "PTIP0003",
+        "PTIP0033",
+        "PTIP0051",
+        "PTIP0064",
+        "RFET0002"
+        ],
+        "thread": 23
+}
