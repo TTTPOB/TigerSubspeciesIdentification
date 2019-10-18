@@ -9,6 +9,7 @@ ADMRUN=list(range(1,21))
 SAMPLEINFO="workfiles/sampleinfo"
 SAMPLENAME="workfiles/samplename"
 NAME=config["name"]
+voucherbwa_gatkparams=config["voucherbwa"]
 scaffolds_to_use=config['scaffolds']
 scaffold_file_md5=hashlib.md5(scaffolds_to_use.encode('utf8')).hexdigest()
 # with open("workfiles/scaffolds_to_use.txt",'r')as f:
@@ -46,7 +47,7 @@ rule subsetgenome:
     shell:
         r"""
         if [ {params.scaffolds}==all ]; then
-            cp {input.ref} {output.fa}
+            ln -s {input.ref} {output.fa}
         else
             samtools faidx {input.ref} `sed 's/,/ /g' {params.scaffolds}` -o {output.fa}
         fi
@@ -96,6 +97,8 @@ rule haplotypecaller:
         ref=rules.subsetgenome.output.fa
     output:
         gvcf="workfiles/haplotypecaller/{name}.vcf.gz",
+    params:
+        voucherbwa=voucherbwa_gatkparams
     threads: THR
     shell:
         r"""
@@ -112,6 +115,7 @@ rule haplotypecaller:
                 -T HaplotypeCaller \
                 -R {input.ref} \
                 -I {input.markdup} \
+                {params.voucherbwa} \
                 --emitRefConfidence GVCF \
                 -o {output.gvcf} \
                 -nct {threads} \
