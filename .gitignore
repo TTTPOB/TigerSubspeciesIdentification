@@ -6,3 +6,4 @@ vcf
 .archive*
 voucherbwa/fastq
 voucherbwa/bam
+voucherbwa/markdup

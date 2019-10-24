@@ -9,7 +9,7 @@ ADMRUN=list(range(1,21))
 SAMPLEINFO="workfiles/sampleinfo"
 SAMPLENAME="workfiles/samplename"
 NAME=config["name"]
-voucherbwa_gatkparams=config["voucherbwa"]
+vouchergvcf_gatkparams=config["vouchergvcf"]
 scaffolds_to_use=config['scaffolds']
 scaffold_file_md5=hashlib.md5(scaffolds_to_use.encode('utf8')).hexdigest()
 # with open("workfiles/scaffolds_to_use.txt",'r')as f:
@@ -56,7 +56,7 @@ rule bwaindex:
     input:
         ref=rules.subsetgenome.output.fa
     output:
-        idx="genome/subsetted"+scaffold_file_md5+".fa.bwt"
+        idx="genome/subsetted/"+scaffold_file_md5+".fa.bwt"
     shell:
         r"""
         bwa index {input.ref}
@@ -96,9 +96,7 @@ rule haplotypecaller:
         markdup=rules.sortandmarkdup.output,
         ref=rules.subsetgenome.output.fa
     output:
-        gvcf="workfiles/haplotypecaller/{name}.vcf.gz",
-    params:
-        voucherbwa=voucherbwa_gatkparams
+        vcf="workfiles/haplotypecaller/{name}.vcf.gz",
     threads: THR
     shell:
         r"""
@@ -115,26 +113,29 @@ rule haplotypecaller:
                 -T HaplotypeCaller \
                 -R {input.ref} \
                 -I {input.markdup} \
-                {params.voucherbwa} \
                 --emitRefConfidence GVCF \
-                -o {output.gvcf} \
+                -o {output.vcf} \
                 -nct {threads} \
                 -variant_index_type LINEAR -variant_index_parameter 128000
         """
 rule genotypegvcfs:
     input:
-        gvcf=rules.haplotypecaller.output.gvcf,
+        vcf=rules.haplotypecaller.output.vcf,
         ref=rules.subsetgenome.output.fa
     output:
         vcf="workfiles/genotypegvcfs/{name}.vcf.gz",
         vcfidx="workfiles/genotypegvcfs/{name}.vcf.gz.tbi"
+    params:
+        voucher=vouchergvcf_gatkparams
     threads: THR
     shell:
         r"""
         gatk3   -Xmx70G \
+                -Djava.io.tmpdir=/bak/archive/tmp \
                 -T GenotypeGVCFs \
                 -R {input.ref} \
-                --variant {input.gvcf} \
+                --variant {input.vcf} \
+                {params.voucher} \
                 -nt {threads} \
                 -o {output.vcf} 
         tabix -p vcf {output.vcf} -f

@@ -1,10 +1,13 @@
+import hashlib
 configfile: "config.json"
 SAMPLECODE=config["samplecode"]
 REF=config["reference"]
 THR=config["thread"]
+SCAFFOLD=config["scaffolds"]
+scaffolds_md5=
 rule all:
     input:
-        bamfile=expand("bam/{samplecode}.bam", samplecode=SAMPLECODE)
+        bamfile=expand("haplotypecaller/{samplecode}.vcf.gz", samplecode=SAMPLECODE)
 
 rule bwa:
     input:
@@ -21,4 +24,36 @@ rule bwa:
         r"""
         bwa mem -t {threads} -M -R {params.rg} {params.ref} {input.fq1} {input.fq2} | \
         samtools view -bh -f3 -F3852 -t{threads} > {output.bam}
+        """
+rule sortandmarkdup:
+    input: 
+        bam=rules.bwa.output.bam
+    output: 
+        bam="markdup/{sample}.bam"
+    threads: THR
+    shell:
+        r"""
+        samtools sort {input.bam} -@{threads} -n -o markdup/{wildcards.sample}_namesort.bam
+        samtools fixmate markdup/{wildcards.sample}_namesort.bam -@{threads} -m markdup/{wildcards.sample}_fixmate.bam
+        samtools sort markdup/{wildcards.sample}_fixmate.bam -@{threads} -o markdup/{wildcards.sample}_positionsort.bam
+        samtools markdup markdup/{wildcards.sample}_positionsort.bam -@{threads} -r -s {output.bam}
+        samtools index {output.bam}
+        """
+rule haplotypecaller:
+    input:
+        markdup=rules.sortandmarkdup.output.bam,
+        ref=REF
+    output:
+        vcf="haplotypecaller/{sample}.vcf.gz",
+    threads: THR
+    shell:
+        r"""
+        gatk3   -Xmx70G \
+                -T HaplotypeCaller \
+                -R {input.ref} \
+                -I {input.markdup} \
+                --emitRefConfidence GVCF \
+                -o {output.vcf} \
+                -nct {threads} \
+                -variant_index_type LINEAR -variant_index_parameter 128000
         """
